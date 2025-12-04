@@ -1,4 +1,5 @@
 import { dataStore, Item, ModifyTask } from "../store";
+import { EventEmitter } from 'events';
 
 interface PageOptions {
     page?: number;
@@ -11,7 +12,15 @@ interface PaginatedResult<T> {
     totalCount: number;
 }
 
-class DataStoreService {
+export type DataChangeEvent =
+    { type: 'item_selected'; payload: number }
+    | { type: 'item_deselected'; payload: number }
+    | { type: 'item_moved'; payload: { draggedItemId: number; targetItemId: number | null } };
+
+export type SseEvent = { type: 'new_items_added'; payload: number[] } | { type: 'batch_update'; payload: DataChangeEvent[] };
+
+
+class DataStoreService extends EventEmitter {
     private addBatchInterval!: NodeJS.Timeout;
     private modifyBatchInterval!: NodeJS.Timeout;
 
@@ -19,6 +28,7 @@ class DataStoreService {
     private readonly MODIFY_BATCH_INTERVAL: number = 1000;
 
     constructor() {
+        super();
         this.startAddBatchProcessing();
         this.startModificationBatchProcessing();
     }
@@ -26,8 +36,11 @@ class DataStoreService {
     private startAddBatchProcessing(): void {
         this.addBatchInterval = setInterval(() => {
             const itemsToAdd = dataStore.getAndClearAddQueue();
-            for (const itemId of itemsToAdd) {
-                dataStore.addNewItemInStore({ id: itemId });
+            if (itemsToAdd.length > 0) {
+                for (const itemId of itemsToAdd) {
+                    dataStore.addNewItemInStore({ id: itemId });
+                }
+                this.emit('update', { type: 'new_items_added', payload: itemsToAdd });
             }
         }, this.ADD_BATCH_INTERVAL);
     }
@@ -35,23 +48,26 @@ class DataStoreService {
     private startModificationBatchProcessing(): void {
         this.modifyBatchInterval = setInterval(() => {
             const tasksToRun = dataStore.getAndClearModifyQueue();
-            for (const task of tasksToRun) {
-                this._executeTask(task);
+            if (tasksToRun.length > 0) {
+                const events: DataChangeEvent[] = tasksToRun.map(task => this._executeTask(task));
+                if(events.length > 0){
+                    this.emit('update', { type: 'batch_update', payload: events });
+                }
             }
         }, this.MODIFY_BATCH_INTERVAL);
     }
 
-    private _executeTask(task: ModifyTask): void {
+    private _executeTask(task: ModifyTask): DataChangeEvent {
         switch (task.action) {
             case 'select':
                 this._executeSelectItem(task.payload.id);
-                break;
+                return { type: 'item_selected', payload: task.payload.id };
             case 'deselect':
                 this._executeDeselectItem(task.payload.id);
-                break;
+                return { type: 'item_deselected', payload: task.payload.id };
             case 'move':
                 this._executeMoveSelectedItem(task.payload.draggedItemId, task.payload.targetItemId);
-                break;
+                return { type: 'item_moved', payload: task.payload };
         }
     }
 

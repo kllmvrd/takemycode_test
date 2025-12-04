@@ -1,7 +1,25 @@
-import { Router } from 'express';
-import { dataStoreService } from '../services/DataStore.service';
+import { Router, Request, Response } from 'express';
+import { dataStoreService, SseEvent } from '../services/DataStore.service';
 
 export const itemRoutes = Router();
+
+itemRoutes.get('/events', (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    const sendUpdate = (event: SseEvent) => {
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+    };
+
+    dataStoreService.on('update', sendUpdate);
+
+    req.on('close', () => {
+        dataStoreService.off('update', sendUpdate);
+        res.end();
+    });
+});
 
 itemRoutes.get('/available', (req, res) => {
     try {
