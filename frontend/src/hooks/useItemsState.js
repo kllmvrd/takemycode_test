@@ -14,8 +14,8 @@ const initialState = {
   isLoadingSelected: false,
   pendingOperations: [],
   activeId: null,
-  hasMoreAvailable: true, 
-  hasMoreSelected: true, 
+  hasMoreAvailable: true,
+  hasMoreSelected: true,
 };
 
 function itemsReducer(state, action) {
@@ -33,13 +33,48 @@ function itemsReducer(state, action) {
         hasMoreSelected: action.payload.selected.items.length > 0,
       };
     
+    case 'SET_FILTERED_DATA': {
+      const { list, data } = action.payload;
+      if (list === 'available') {
+        return {
+          ...state,
+          availableItems: data.items,
+          totalAvailable: data.totalCount,
+          isLoadingAvailable: false,
+          hasMoreAvailable: data.items.length > 0,
+          availablePage: 1,
+        };
+      }
+      if (list === 'selected') {
+        return {
+          ...state,
+          selectedItems: data.items.map(item => ({ ...item, status: 'confirmed' })),
+          totalSelected: data.totalCount,
+          isLoadingSelected: false,
+          hasMoreSelected: data.items.length > 0,
+          selectedPage: 1,
+        };
+      }
+      return state;
+    }
+
+    case 'SET_FILTER': {
+      const { list, value } = action.payload;
+      if (list === 'available') {
+        return { ...state, availableFilter: value };
+      }
+      if (list === 'selected') {
+        return { ...state, selectedFilter: value };
+      }
+      return state;
+    }
+
     case 'LOAD_MORE_AVAILABLE':
       return {
         ...state,
         availableItems: [...state.availableItems, ...action.payload.items],
         availablePage: state.availablePage + 1,
         isLoadingAvailable: false,
-        hasMoreAvailable: action.payload.items.length > 0,
       };
 
     case 'LOAD_MORE_SELECTED':
@@ -48,7 +83,6 @@ function itemsReducer(state, action) {
         selectedItems: [...state.selectedItems, ...action.payload.items.map(item => ({...item, status: 'confirmed'}))],
         selectedPage: state.selectedPage + 1,
         isLoadingSelected: false,
-        hasMoreSelected: action.payload.items.length > 0,
       };
     
     case 'SET_HAS_MORE':
@@ -112,7 +146,7 @@ function itemsReducer(state, action) {
         newSelected.splice(targetIndex, 0, itemToMove);
       } else if (opType === 'pending_deselect') {
         newSelected = newSelected.filter(item => item.id !== draggedItemId);
-        newAvailable.push({ id: draggedItemId, status: 'pending' });
+        newAvailable.push({ id: itemId, status: 'confirmed' });
         newAvailable.sort((a, b) => a.id - b.id);
       }
       
@@ -149,7 +183,9 @@ function itemsReducer(state, action) {
           if (existingInSelected) {
             existingInSelected.status = 'confirmed';
           } else {
-            newSelected.push({ id: itemId, status: 'confirmed' });
+            if (!state.selectedFilter || String(itemId).includes(state.selectedFilter)) {
+              newSelected.push({ id: itemId, status: 'confirmed' });
+            }
           }
         } 
         else if (op.type === 'item_deselected') {
@@ -158,7 +194,9 @@ function itemsReducer(state, action) {
           if (existingInAvailable) {
             existingInAvailable.status = 'confirmed';
           } else {
-            newAvailable.push({ id: itemId, status: 'confirmed' });
+            if (!state.availableFilter || String(itemId).includes(state.availableFilter)) {
+              newAvailable.push({ id: itemId, status: 'confirmed' });
+            }
           }
         } 
         else if (op.type === 'item_moved') {
@@ -177,7 +215,7 @@ function itemsReducer(state, action) {
           }
         }
       });
-
+      
       newAvailable.sort((a,b) => a.id - b.id);
 
       return {
@@ -198,4 +236,3 @@ function itemsReducer(state, action) {
 export const useItemsState = () => {
     return useReducer(itemsReducer, initialState);
 };
-

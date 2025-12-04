@@ -2,6 +2,7 @@ import React from 'react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import DroppableTable from '../DroppableTable/DroppableTable';
 import DraggableElement from '../DraggableElement/DraggableElement';
+import Input from '../Input/Input'; 
 import styles from './ItemsList.module.css';
 
 const ItemsList = ({
@@ -12,12 +13,20 @@ const ItemsList = ({
   onScroll,
   isLoading,
   tableRef,
+  filterValue,      
+  onFilterChange,   
 }) => {
   const itemIds = items.map(item => item.id);
 
   return (
     <div className={styles.listContainer}>
       <h2 className={styles.listTitle}>{title}</h2>
+      <Input
+        type="search"
+        placeholder="Фильтр по ID..."
+        value={filterValue}
+        onChange={onFilterChange}
+      />
       <DroppableTable id={id} onScroll={onScroll} tableRef={tableRef}>
         <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
           {items.map(item => (

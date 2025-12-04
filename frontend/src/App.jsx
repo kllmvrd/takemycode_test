@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useCallback } from 'react';
+import useDebounce from './hooks/useDebounce'; // Import useDebounce hook
 import { useItemsState } from './hooks/useItemsState';
 import {
   getAvailableItems,
@@ -20,7 +21,6 @@ import {
   pointerWithin,
   DragOverlay,
 } from '@dnd-kit/core';
-import { arrayMove } from '@dnd-kit/sortable';
 
 import './App.css';
 
@@ -31,6 +31,9 @@ function App() {
     availableFilter, selectedFilter, totalAvailable, totalSelected,
     isLoadingAvailable, isLoadingSelected, hasMoreAvailable, hasMoreSelected, activeId,
   } = state;
+
+  const debouncedAvailableFilter = useDebounce(availableFilter, 500);
+  const debouncedSelectedFilter = useDebounce(selectedFilter, 500);
 
   const availableTableRef = useRef(null);
   const selectedTableRef = useRef(null);
@@ -70,8 +73,8 @@ function App() {
     const { id: draggedItemId } = active;
     const { id: overId } = over;
 
-    const sourceContainer = getContainerId(draggedItemId);
-    const destinationContainer = getContainerId(overId) || over.id;
+    const sourceContainer = getContainerId(active.id);
+    const destinationContainer = getContainerId(over.id) || over.id;
 
     if (!sourceContainer || !destinationContainer || (sourceContainer === destinationContainer && draggedItemId === overId)) {
       return;
@@ -85,7 +88,7 @@ function App() {
         if (oldIndex !== -1 && newIndex !== -1) {
           dispatch({ type: 'OPTIMISTIC_MOVE', payload: { oldIndex, newIndex, draggedItemId } });
           try {
-            const reorderedItems = arrayMove(state.selectedItems, oldIndex, newIndex);
+            const reorderedItems = arrayMove(state.selectedItems, oldIndex, newIndex); // This is needed here for calculation
             const finalIndexOfMovedItem = reorderedItems.findIndex(item => item.id === draggedItemId);
             const itemAfterMoved = reorderedItems[finalIndexOfMovedItem + 1];
             
@@ -131,13 +134,40 @@ function App() {
   }, [state.availableItems, state.selectedItems, dispatch]);
 
 
+  const handleAvailableFilterChange = useCallback((e) => {
+    dispatch({ type: 'SET_FILTER', payload: { list: 'available', value: e.target.value } });
+  }, [dispatch]);
+
+  const handleSelectedFilterChange = useCallback((e) => {
+    dispatch({ type: 'SET_FILTER', payload: { list: 'selected', value: e.target.value } });
+  }, [dispatch]);
+
+  useEffect(() => {
+    const fetchFilteredAvailable = async () => {
+      dispatch({ type: 'SET_LOADING', payload: { list: 'available', value: true } });
+      const data = await getAvailableItems(1, 20, debouncedAvailableFilter);
+      dispatch({ type: 'SET_FILTERED_DATA', payload: { list: 'available', data } });
+    };
+    fetchFilteredAvailable();
+  }, [debouncedAvailableFilter, dispatch]); 
+
+  useEffect(() => {
+    const fetchFilteredSelected = async () => {
+      dispatch({ type: 'SET_LOADING', payload: { list: 'selected', value: true } });
+      const data = await getSelectedItems(1, 20, debouncedSelectedFilter);
+      dispatch({ type: 'SET_FILTERED_DATA', payload: { list: 'selected', data } });
+    };
+    fetchFilteredSelected();
+  }, [debouncedSelectedFilter, dispatch]); 
+
+
   useEffect(() => {
     (async () => {
       dispatch({ type: 'SET_LOADING', payload: { list: 'available', value: true } });
       dispatch({ type: 'SET_LOADING', payload: { list: 'selected', value: true } });
       const [availableData, selectedData] = await Promise.all([
-        getAvailableItems(1, 20, ''),
-        getSelectedItems(1, 20, '')
+        getAvailableItems(1, 20, availableFilter), 
+        getSelectedItems(1, 20, selectedFilter)  
       ]);
       dispatch({ type: 'SET_INITIAL_DATA', payload: { available: availableData, selected: selectedData } });
     })();
@@ -151,7 +181,7 @@ function App() {
     });
 
     return () => unsubscribe();
-  }, [dispatch]);
+  }, [dispatch, availableFilter, selectedFilter]); 
 
   return (
     <DndContext 
@@ -170,6 +200,8 @@ function App() {
           onScroll={(e) => handleScroll('available', e)}
           isLoading={isLoadingAvailable}
           tableRef={availableTableRef}
+          filterValue={availableFilter} 
+          onFilterChange={handleAvailableFilterChange}
         />
         <ItemsList
           id="selected"
@@ -179,6 +211,8 @@ function App() {
           onScroll={(e) => handleScroll('selected', e)}
           isLoading={isLoadingSelected}
           tableRef={selectedTableRef}
+          filterValue={selectedFilter} 
+          onFilterChange={handleSelectedFilterChange} 
         />
       </div>
 
@@ -190,4 +224,3 @@ function App() {
 }
 
 export default App;
-
