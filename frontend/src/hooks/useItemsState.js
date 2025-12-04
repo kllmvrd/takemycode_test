@@ -146,7 +146,7 @@ function itemsReducer(state, action) {
         newSelected.splice(targetIndex, 0, itemToMove);
       } else if (opType === 'pending_deselect') {
         newSelected = newSelected.filter(item => item.id !== draggedItemId);
-        newAvailable.push({ id: itemId, status: 'confirmed' });
+        newAvailable.push({ id: draggedItemId, status: 'confirmed' });
         newAvailable.sort((a, b) => a.id - b.id);
       }
       

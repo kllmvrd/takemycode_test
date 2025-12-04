@@ -9,7 +9,6 @@
   background-color: hsl(0 0% 100%); 
   color: hsl(222.2 47.4% 11.2%); 
   box-sizing: border-box;
-  margin-bottom: 1rem;
 }
 
 .input:focus-visible {

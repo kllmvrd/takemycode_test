@@ -4,12 +4,12 @@
   flex-basis: 50%;
   min-width: 300px;
   max-height: 80vh; 
+  gap: 16px;
 }
 
 .listTitle {
   font-size: 1.25rem; 
   font-weight: 600; 
-  margin-bottom: 1rem; 
   color: hsl(222.2 47.4% 11.2%); 
 }
 

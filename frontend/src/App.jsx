@@ -1,16 +1,19 @@
-import React, { useEffect, useRef, useCallback } from 'react';
-import useDebounce from './hooks/useDebounce'; // Import useDebounce hook
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { useItemsState } from './hooks/useItemsState';
+import useDebounce from './hooks/useDebounce';
 import {
   getAvailableItems,
   getSelectedItems,
   selectItem,
   deselectItem,
   moveItem,
-  subscribeToEvents
+  subscribeToEvents,
+  queueNewItem
 } from './api';
 import ItemsList from './components/ItemsList/ItemsList';
 import Element from './components/Element/Element';
+import Input from './components/Input/Input';
+import Button from './components/Button/Button';
 
 import {
   DndContext,
@@ -21,11 +24,13 @@ import {
   pointerWithin,
   DragOverlay,
 } from '@dnd-kit/core';
+import { arrayMove } from '@dnd-kit/sortable';
 
 import './App.css';
 
 function App() {
   const [state, dispatch] = useItemsState();
+  const [newItemId, setNewItemId] = useState(''); 
   const {
     availableItems, selectedItems, availablePage, selectedPage,
     availableFilter, selectedFilter, totalAvailable, totalSelected,
@@ -66,6 +71,21 @@ function App() {
   const onDragStart = useCallback((event) => dispatch({ type: 'DRAG_START', payload: event.active.id }), [dispatch]);
   const onDragCancel = useCallback(() => dispatch({ type: 'DRAG_CANCEL' }), [dispatch]);
 
+  const handleAddItem = async () => {
+    const id = parseInt(newItemId, 10);
+    if (isNaN(id) || id <= 0) {
+      alert('Пожалуйста, введите корректный положительный ID.');
+      return;
+    }
+    try {
+      await queueNewItem(id);
+      setNewItemId('');
+    } catch (error) {
+      console.error("Error queueing new item:", error);
+      alert(`Не удалось добавить элемент: ${error.response?.data?.message || error.message}`);
+    }
+  };
+
   const onDragEnd = useCallback(async ({ active, over }) => {
     dispatch({ type: 'DRAG_END' });
     if (!over) return;
@@ -88,7 +108,7 @@ function App() {
         if (oldIndex !== -1 && newIndex !== -1) {
           dispatch({ type: 'OPTIMISTIC_MOVE', payload: { oldIndex, newIndex, draggedItemId } });
           try {
-            const reorderedItems = arrayMove(state.selectedItems, oldIndex, newIndex); // This is needed here for calculation
+            const reorderedItems = arrayMove(state.selectedItems, oldIndex, newIndex); 
             const finalIndexOfMovedItem = reorderedItems.findIndex(item => item.id === draggedItemId);
             const itemAfterMoved = reorderedItems[finalIndexOfMovedItem + 1];
             
@@ -184,42 +204,60 @@ function App() {
   }, [dispatch, availableFilter, selectedFilter]); 
 
   return (
-    <DndContext 
-      sensors={sensors} 
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd} 
-      onDragCancel={onDragCancel}
-      collisionDetection={pointerWithin}
-    >
-      <div className="app-container">
-        <ItemsList
-          id="available"
-          title="Доступные элементы"
-          items={availableItems}
-          activeId={activeId}
-          onScroll={(e) => handleScroll('available', e)}
-          isLoading={isLoadingAvailable}
-          tableRef={availableTableRef}
-          filterValue={availableFilter} 
-          onFilterChange={handleAvailableFilterChange}
-        />
-        <ItemsList
-          id="selected"
-          title="Выбранные элементы"
-          items={selectedItems}
-          activeId={activeId}
-          onScroll={(e) => handleScroll('selected', e)}
-          isLoading={isLoadingSelected}
-          tableRef={selectedTableRef}
-          filterValue={selectedFilter} 
-          onFilterChange={handleSelectedFilterChange} 
-        />
-      </div>
+    <div className="app-wrapper">
+      <DndContext 
+        sensors={sensors} 
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd} 
+        onDragCancel={onDragCancel}
+        collisionDetection={pointerWithin}
+      >
+        <div className="new-item-container">
+          <Input
+            type="number"
+            value={newItemId}
+            onChange={(e) => setNewItemId(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleAddItem();
+              }
+            }}
+            placeholder="ID нового элемента"
+          />
+          <Button onClick={handleAddItem}>
+            Добавить
+          </Button>
+        </div>
+        <div className="app-container">
+          <ItemsList
+            id="available"
+            title="Доступные элементы"
+            items={availableItems}
+            activeId={activeId}
+            onScroll={(e) => handleScroll('available', e)}
+            isLoading={isLoadingAvailable}
+            tableRef={availableTableRef}
+            filterValue={availableFilter} 
+            onFilterChange={handleAvailableFilterChange}
+          />
+          <ItemsList
+            id="selected"
+            title="Выбранные элементы"
+            items={selectedItems}
+            activeId={activeId}
+            onScroll={(e) => handleScroll('selected', e)}
+            isLoading={isLoadingSelected}
+            tableRef={selectedTableRef}
+            filterValue={selectedFilter} 
+            onFilterChange={handleSelectedFilterChange} 
+          />
+        </div>
 
-      <DragOverlay>
-        {activeId ? <Element id={activeId} isOverlay={true}/> : null}
-      </DragOverlay>
-    </DndContext>
+        <DragOverlay>
+          {activeId ? <Element id={activeId} isOverlay={true}/> : null}
+        </DragOverlay>
+      </DndContext>
+    </div>
   );
 }
 
