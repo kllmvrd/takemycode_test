@@ -53,8 +53,11 @@ itemRoutes.post('/queue', (req, res) => {
         if (typeof id !== 'number') {
             return res.status(400).json({ message: 'Invalid ID provided' });
         }
-        dataStoreService.queueNewItem(id);
-        res.status(202).json({ message: 'Item queued for addition' });
+        const status = dataStoreService.queueNewItem(id);
+        if(status) {
+            return res.status(202).json({ message: 'Item queued for addition' });
+        } 
+        return res.status(400).json({message: 'Already Exist'})
     } catch (error) {
         res.status(500).json({ message: 'Internal Server Error' });
     }

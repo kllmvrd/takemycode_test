@@ -118,8 +118,8 @@ class DataStoreService extends EventEmitter {
         clearInterval(this.modifyBatchInterval);
     }
 
-    public queueNewItem(id: number): void {
-        dataStore.addItemToAddQueue(id);
+    public queueNewItem(id: number): boolean {
+        return dataStore.addItemToAddQueue(id);
     }
 
     public selectItem(id: number): void {
