@@ -25,6 +25,8 @@ import {
   DragOverlay,
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 import './App.css';
 
@@ -74,15 +76,16 @@ function App() {
   const handleAddItem = async () => {
     const id = parseInt(newItemId, 10);
     if (isNaN(id) || id <= 0) {
-      alert('Пожалуйста, введите корректный положительный ID.');
+      toast.error('Пожалуйста, введите корректный положительный ID.');
       return;
     }
     try {
       await queueNewItem(id);
       setNewItemId('');
+      toast.success(`Элемент ${id} успешно добавлен в очередь.`);
     } catch (error) {
       console.error("Error queueing new item:", error);
-      alert(`Не удалось добавить элемент: ${error.response?.data?.message || error.message}`);
+      toast.error(`Не удалось добавить элемент ${id} ${error.response?.data?.message || error.message}`);
     }
   };
 
@@ -197,6 +200,9 @@ function App() {
       if (event.type === 'batch_update') {
         dispatch({ type: 'SSE_BATCH_UPDATE', payload: event.payload });
       } else if (event.type === 'new_items_added') {
+        event.payload.forEach(itemId => {
+          toast.success(`Добавлен новый элемент: ${itemId}`);
+        });
       }
     });
 
@@ -257,6 +263,18 @@ function App() {
           {activeId ? <Element id={activeId} isOverlay={true}/> : null}
         </DragOverlay>
       </DndContext>
+      <ToastContainer 
+        position="bottom-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   );
 }
